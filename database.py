@@ -1,122 +1,78 @@
-import sqlite3
+import firebase_admin
+from firebase_admin import credentials, firestore
+import streamlit as st
+import json
 
-def conectar():
-    # 🎯 check_same_thread=False permite que múltiplos clientes acessem o site ao mesmo tempo sem travar
-    return sqlite3.connect("restaurante.db", check_same_thread=False)
-
-def criar_tabelas():
-    conn = conectar()
-    cursor = conn.cursor()
-    
-    # 🎯 Tabela de Produtos (Atualizada com 'descricao')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS produtos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome TEXT NOT NULL,
-            preco REAL NOT NULL,
-            categoria TEXT,
-            descricao TEXT DEFAULT ''
-        )
-    ''')
-    
-    # 🎯 Tabela de Pedidos (Atualizada com 'endereco')
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS pedidos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            cliente TEXT NOT NULL,
-            telefone TEXT NOT NULL,
-            itens TEXT NOT NULL,
-            total REAL NOT NULL,
-            status TEXT DEFAULT 'Pendente',
-            endereco TEXT DEFAULT ''
-        )
-    ''')
-    conn.commit()
-    
-    # 🛡️ MÁGICA DA CORREÇÃO AUTOMÁTICA (Migração de Banco Seguro)
-    # Se o banco já existia antigo no seu computador, esse bloco injeta as colunas que faltam sem quebrar nada!
-    try:
-        cursor.execute("ALTER TABLE produtos ADD COLUMN descricao TEXT DEFAULT ''")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass # Se a coluna já existir, ele ignora e não dá erro
+# Verifica se o Firebase já foi iniciado para não dar erro de duplicação
+if not firebase_admin._apps:
+    # Se estiver rodando na internet (Streamlit Cloud), usa os Secrets
+    if "firebase" in st.secrets:
+        secret_json = json.loads(st.secrets["firebase"]["json"])
+        cred = credentials.Certificate(secret_json)
+    # Se estiver rodando no seu computador local, usa o arquivo .json
+    else:
+        cred = credentials.Certificate("firebase_credentials.json")
         
-    try:
-        cursor.execute("ALTER TABLE pedidos ADD COLUMN endereco TEXT DEFAULT ''")
-        conn.commit()
-    except sqlite3.OperationalError:
-        pass # Se a coluna já existir, ele ignora e não dá erro
+    firebase_admin.initialize_app(cred)
 
-    conn.close()
+db = firestore.client()
 
 # ========================================================
-# 📦 FUNÇÕES PARA PRODUTOS
+# 📦 FUNÇÕES PARA PRODUTOS (FIREBASE)
 # ========================================================
 
-# 🎯 Atualizada com 4 argumentos para aceitar a descrição!
 def salvar_produto(nome, preco, categoria, descricao=""):
-    conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO produtos (nome, preco, categoria, descricao) VALUES (?, ?, ?, ?)", 
-        (nome, preco, categoria, descricao)
-    )
-    conn.commit()
-    conn.close()
+    """🔥 Salva ou atualiza um produto direto na nuvem do Firebase"""
+    dados = {
+        "nome": nome,
+        "preco": float(preco),
+        "categoria": categoria,
+        "descricao": descricao
+    }
+    # Cria um novo documento na coleção 'produtos'
+    db.collection("produtos").add(dados)
 
 def listar_produtos():
-    conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM produtos")
-    dados = cursor.fetchall()
-    conn.close()
-    return dados
+    """🔥 Puxa todos os produtos direto da nuvem em tempo real"""
+    produtos = []
+    docs = db.collection("produtos").stream()
+    for doc in docs:
+        p = doc.to_dict()
+        # Formatamos igual ao SQLite para não precisar mudar nada no cardapio.py (id, nome, preco, categoria, descricao)
+        produtos.append((doc.id, p.get("nome"), p.get("preco"), p.get("categoria"), p.get("descricao", "")))
+    return produtos
 
 def excluir_produto(produto_id):
-    """
-    ❌ Remove um produto do cardápio permanentemente usando o ID selecionado.
-    """
-    conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM produtos WHERE id = ?", (produto_id,))
-    conn.commit()
-    conn.close()
+    """❌ Remove o produto usando o ID único gerado pelo Firebase"""
+    db.collection("produtos").document(produto_id).delete()
 
 # ========================================================
-# 📋 FUNÇÕES PARA PEDIDOS
+# 📋 FUNÇÕES PARA PEDIDOS (FIREBASE)
 # ========================================================
 
-# 🎯 Atualizada para salvar também o endereço que criamos no PDV!
 def salvar_pedido(cliente, telephone, itens, total, status='Pendente', endereco=''):
-    """
-    Ajustado para salvar o status e o endereço corretamente!
-    """
-    conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO pedidos (cliente, telefone, itens, total, status, endereco) VALUES (?, ?, ?, ?, ?, ?)", 
-        (cliente, telephone, itens, total, status, endereco)
-    )
-    conn.commit()
-    conn.close()
+    """🔥 Salva o pedido na nuvem para a gestão ler instantaneamente"""
+    dados = {
+        "cliente": cliente,
+        "telefone": telephone,
+        "itens": itens,
+        "total": float(total),
+        "status": status,
+        "endereco": endereco,
+        "data_hora": firestore.SERVER_TIMESTAMP # Organiza por ordem de chegada
+    }
+    db.collection("pedidos").add(dados)
 
 def listar_pedidos():
-    conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM pedidos ORDER BY id DESC")
-    dados = cursor.fetchall()
-    conn.close()
-    return dados
+    """🔥 Lista todos os pedidos ordenados pelos mais recentes"""
+    pedidos = []
+    # Busca os pedidos ordenando pela data/hora que foram criados
+    docs = db.collection("pedidos").order_by("data_hora", direction=firestore.Query.DESCENDING).stream()
+    for doc in docs:
+        p = doc.to_dict()
+        pedidos.append((doc.id, p.get("cliente"), p.get("telefone"), p.get("itens"), p.get("total"), p.get("status"), p.get("endereco")))
+    return pedidos
 
 def atualizar_status_pedido(pedido_id, novo_status):
-    conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE pedidos SET status = ? WHERE id = ?", (novo_status, pedido_id))
-    conn.commit()
-    conn.close()
-
-# ========================================================
-# 🎯 INICIALIZAÇÃO AUTOMÁTICA DE SEGURANÇA
-# ========================================================
-# Garante que as tabelas nasçam sozinhas assim que o Streamlit abrir na internet!
-criar_tabelas()
+    """🔥 Atualiza o status (Ex: De 'Pendente' para 'Em Preparo') na nuvem"""
+    db.collection("pedidos").document(pedido_id).update({"status": novo_status})
