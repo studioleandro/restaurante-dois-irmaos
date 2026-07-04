@@ -76,12 +76,12 @@ def listar_produtos():
         return []
 
 def excluir_produto(produto_id):
-    """❌ Remove o produto usando o ID único gerado pelo Firebase"""
+    """❌ Remove o produto usando o ID único gerado pelo Firebase e retorna sucesso"""
     try:
         db.collection("produtos").document(produto_id).delete()
         return True
     except Exception as e:
-        print(f"❌ Erro ao excluir produto {produto_id}: {e}")
+        print(f"❌ Erro ao excluir produto {produto_id} no Firebase: {e}")
         return False
 
 # ========================================================
