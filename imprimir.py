@@ -1,12 +1,26 @@
-import win32print
-import win32ui
+import sys
 from datetime import datetime
+
+# ☁️ VALIDAÇÃO DE AMBIENTE: Evita que o Streamlit Cloud (Linux) quebre ao iniciar
+try:
+    import win32print
+    import win32ui
+    WINDOWS_DISPONIVEL = True
+except ImportError:
+    WINDOWS_DISPONIVEL = False
 
 def imprimir_cupom_profissional(cliente, telefone, itens, total, observacoes=""):
     """
     Imprime um cupom idêntico ao modelo do iFood TOTALMENTE EM NEGRITO.
     Otimizado para bobinas de 58mm (Estrito em 24 caracteres por linha).
+    Seguro para rodar tanto localmente no Windows quanto na Nuvem (Linux).
     """
+    
+    # Se estiver rodando na nuvem do Streamlit, pula a impressão física e retorna sucesso
+    if not WINDOWS_DISPONIVEL:
+        print("☁️ Rodando na Nuvem: Pedido registrado no banco com sucesso (impressão local pulada).")
+        return True
+
     try:
         nome_impressora = win32print.GetDefaultPrinter()
         
@@ -38,8 +52,8 @@ def imprimir_cupom_profissional(cliente, telefone, itens, total, observacoes="")
             "========================",
             "     [ENTREGA RAPIDA]   ", 
             "------------------------",
-            f"PEDIDO EM: {data_hora[:10]}",
-            f"HORÁRIO:      {data_hora[11:]}",
+            "PEDIDO EM: " + str(data_hora[:10]),
+            "HORÁRIO:      " + str(data_hora[11:]),
             "------------------------",
             "CLIENTE MENSAGEM WA:",
             f"{cliente[:24].upper()}",
