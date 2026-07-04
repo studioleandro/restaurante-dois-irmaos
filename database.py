@@ -5,12 +5,15 @@ import json
 
 # Verifica se o Firebase já foi iniciado para não dar erro de duplicação
 if not firebase_admin._apps:
-    # Se estiver rodando na internet (Streamlit Cloud), usa os Secrets
-    if "firebase" in st.secrets:
-        secret_json = json.loads(st.secrets["firebase"]["json"])
-        cred = credentials.Certificate(secret_json)
-    # Se estiver rodando no seu computador local, usa o arquivo .json
-    else:
+    try:
+        # Tenta ver se está na internet (Streamlit Cloud) com os Secrets salvos
+        if "firebase" in st.secrets:
+            secret_json = json.loads(st.secrets["firebase"]["json"])
+            cred = credentials.Certificate(secret_json)
+        else:
+            cred = credentials.Certificate("firebase_credentials.json")
+    except Exception:
+        # Se der qualquer erro de falta de Secrets (indica que está rodando no seu PC local)
         cred = credentials.Certificate("firebase_credentials.json")
         
     firebase_admin.initialize_app(cred)
