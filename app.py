@@ -6,7 +6,7 @@ import os
 import imprimir as imp  # <-- Adicione esta linha no topo junto com os outros imports
 
 # Inicializa o Banco de Dados
-db.criar_tabelas()
+
 
 st.set_page_config(page_title="GESTAO DOIS IRMAOS", page_icon="logo.jpg", layout="wide")
 

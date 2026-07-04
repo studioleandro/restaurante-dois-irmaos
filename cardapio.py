@@ -4,6 +4,12 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
 import pandas as pd
+import database as db  # Puxa o seu arquivo de banco de dados
+
+# 🎯 ADICIONE ESSA LINHA AQUI EMBAIXO PARA CRIAR AS TABELAS NA NUVEM:
+
+
+# Configuração de Página Única... (resto do código continua igual)
 import database as db  # Puxa o seu arquivo de banco de dados atualizado
 
 # Configuração de Página Única
