@@ -1,7 +1,8 @@
 import sqlite3
 
 def conectar():
-    return sqlite3.connect("restaurante.db")
+    # 🎯 check_same_thread=False permite que múltiplos clientes acessem o site ao mesmo tempo sem travar
+    return sqlite3.connect("restaurante.db", check_same_thread=False)
 
 def criar_tabelas():
     conn = conectar()
@@ -113,3 +114,9 @@ def atualizar_status_pedido(pedido_id, novo_status):
     cursor.execute("UPDATE pedidos SET status = ? WHERE id = ?", (novo_status, pedido_id))
     conn.commit()
     conn.close()
+
+# ========================================================
+# 🎯 INICIALIZAÇÃO AUTOMÁTICA DE SEGURANÇA
+# ========================================================
+# Garante que as tabelas nasçam sozinhas assim que o Streamlit abrir na internet!
+criar_tabelas()
